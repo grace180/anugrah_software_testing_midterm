@@ -1,9 +1,9 @@
-import 'package:anugrah_software_testing/model/user.dart';
+import 'package:flutter/material.dart';
 import 'package:anugrah_software_testing/model/authService.dart';
-
+import 'package:anugrah_software_testing/model/user.dart';
 class AuthViewModel {
   final AuthService authService;
-  User? user;
+  User? currentUser;
   bool isLoading = false;
   String? errorMessage;
 
@@ -11,20 +11,69 @@ class AuthViewModel {
 
   String? validateUsername(String username) {
     if (username.isEmpty) return 'Username cannot be empty';
+    if (username.length > 20) return 'Username cannot exceed 20 characters';
+    if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(username)) {
+      return 'Username can only contain alphanumeric characters';
+    }
     return null;
   }
 
   String? validatePassword(String password) {
     if (password.isEmpty) return 'Password cannot be empty';
     if (password.length < 6) return 'Password must be at least 6 characters';
+    if (password.length > 50) return 'Password cannot exceed 50 characters';
     return null;
   }
 
   Future<void> login(String username, String password) async {
+  try {
+
+    final usernameError = validateUsername(username);
+    final passwordError = validatePassword(password);
+    
+    if (usernameError != null) {
+      errorMessage = usernameError;
+      return;
+    }
+    
+    if (passwordError != null) {
+      errorMessage = passwordError;
+      return;
+    }
+
+    isLoading = true;
+    errorMessage = null;
+    currentUser = await authService.login(
+      username: username,
+      password: password,
+      expiresInMins: 30,
+    );
+  } catch (e) {
+    errorMessage = 'Invalid credentials';
+
+    debugPrint('Login error: ${e.toString()}');
+  } finally {
+    isLoading = false;
+  }
+}
+
+  Future<void> fetchCurrentUser() async {
     try {
       isLoading = true;
       errorMessage = null;
-      user = await authService.login(username, password);
+      currentUser = await authService.getCurrentUser();
+    } catch (e) {
+      errorMessage = e.toString();
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  Future<void> refreshToken() async {
+    try {
+      isLoading = true;
+      errorMessage = null;
+      currentUser = await authService.refreshToken(expiresInMins: 30);
     } catch (e) {
       errorMessage = e.toString();
     } finally {
@@ -34,6 +83,6 @@ class AuthViewModel {
 
   Future<void> logout() async {
     await authService.logout();
-    user = null;
+    currentUser = null;
   }
 }
