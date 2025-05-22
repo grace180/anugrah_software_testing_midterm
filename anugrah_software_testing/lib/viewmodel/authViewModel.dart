@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:anugrah_software_testing/model/authService.dart';
 import 'package:anugrah_software_testing/model/user.dart';
-class AuthViewModel {
+class AuthViewModel extends ChangeNotifier {
   final AuthService authService;
   User? currentUser;
   bool isLoading = false;
@@ -9,6 +9,7 @@ class AuthViewModel {
 
   AuthViewModel({required this.authService});
 
+  // Panggil notifyListeners() setiap ada perubahan agar UI bisa update
   String? validateUsername(String username) {
     if (username.isEmpty) return 'Username cannot be empty';
     if (username.length > 20) return 'Username cannot exceed 20 characters';
@@ -26,46 +27,52 @@ class AuthViewModel {
   }
 
   Future<void> login(String username, String password) async {
-  try {
+    try {
+      final usernameError = validateUsername(username);
+      final passwordError = validatePassword(password);
 
-    final usernameError = validateUsername(username);
-    final passwordError = validatePassword(password);
-    
-    if (usernameError != null) {
-      errorMessage = usernameError;
-      return;
+      if (usernameError != null) {
+        errorMessage = usernameError;
+        notifyListeners();
+        return;
+      }
+
+      if (passwordError != null) {
+        errorMessage = passwordError;
+        notifyListeners();
+        return;
+      }
+
+      isLoading = true;
+      errorMessage = null;
+      notifyListeners();
+
+      currentUser = await authService.login(
+        username: username,
+        password: password,
+        expiresInMins: 30,
+      );
+    } catch (e) {
+      errorMessage = 'Invalid credentials';
+      debugPrint('Login error: ${e.toString()}');
+    } finally {
+      isLoading = false;
+      notifyListeners();
     }
-    
-    if (passwordError != null) {
-      errorMessage = passwordError;
-      return;
-    }
-
-    isLoading = true;
-    errorMessage = null;
-    currentUser = await authService.login(
-      username: username,
-      password: password,
-      expiresInMins: 30,
-    );
-  } catch (e) {
-    errorMessage = 'Invalid credentials';
-
-    debugPrint('Login error: ${e.toString()}');
-  } finally {
-    isLoading = false;
   }
-}
 
   Future<void> fetchCurrentUser() async {
     try {
       isLoading = true;
       errorMessage = null;
+      notifyListeners();
+
       currentUser = await authService.getCurrentUser();
     } catch (e) {
       errorMessage = e.toString();
     } finally {
       isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -73,16 +80,20 @@ class AuthViewModel {
     try {
       isLoading = true;
       errorMessage = null;
+      notifyListeners();
+
       currentUser = await authService.refreshToken(expiresInMins: 30);
     } catch (e) {
       errorMessage = e.toString();
     } finally {
       isLoading = false;
+      notifyListeners();
     }
   }
 
   Future<void> logout() async {
     await authService.logout();
     currentUser = null;
+    notifyListeners();
   }
 }
